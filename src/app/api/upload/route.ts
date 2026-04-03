@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { storeDatasetMemory } from "@/lib/pinecone";
 import Papa from "papaparse";
+
+export const maxDuration = 60;
 
 interface ColumnInfo {
   name: string;
@@ -102,9 +103,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Store dataset info in Pinecone memory
+    // Store dataset info in Pinecone memory (optional)
     const summary = `Dataset "${file.name}" uploaded with ${data.length} rows and ${columns.length} columns. Columns: ${columns.map((c) => `${c.name} (${c.type})`).join(", ")}`;
-    await storeDatasetMemory(userId, dataset.id, summary).catch(() => {});
+    try {
+      const { storeDatasetMemory } = await import("@/lib/pinecone");
+      await storeDatasetMemory(userId, dataset.id, summary).catch(() => {});
+    } catch {
+      // Pinecone not available, skip
+    }
 
     return NextResponse.json({
       dataset: {

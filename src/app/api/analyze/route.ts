@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { analyzeCSVWithGroq } from "@/lib/groq";
-import { storeAnalysisMemory } from "@/lib/pinecone";
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
@@ -100,7 +101,12 @@ Include chart blocks for feature importance and model comparison.`
 
     // Store in Pinecone
     const summary = `${mlType} analysis on "${dataset.name}"${target ? ` targeting "${target}"` : ""} - completed`;
-    await storeAnalysisMemory(userId, analysis.id, summary).catch(() => {});
+    try {
+      const { storeAnalysisMemory } = await import("@/lib/pinecone");
+      await storeAnalysisMemory(userId, analysis.id, summary).catch(() => {});
+    } catch {
+      // Pinecone not available, skip
+    }
 
     return NextResponse.json({
       analysisId: analysis.id,
