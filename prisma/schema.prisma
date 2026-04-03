@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  clerkId       String         @unique
+  email         String         @unique
+  name          String?
+  imageUrl      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  datasets      Dataset[]
+  analyses      Analysis[]
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String    @default("New Conversation")
+  userId    String
+  user      User      @relation(fields: [userId], references: [clerkId])
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  role           String       // "user" | "assistant"
+  content        String       @db.Text
+  metadata       Json?        // charts, graphs, analysis results
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model Dataset {
+  id        String     @id @default(cuid())
+  name      String
+  fileName  String
+  columns   Json       // column names and types
+  rowCount  Int
+  fileSize  Int
+  data      Json       @db.JsonB // stored CSV data
+  userId    String
+  user      User       @relation(fields: [userId], references: [clerkId])
+  analyses  Analysis[]
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  type        String   // "classification", "regression", "clustering", "time_series", "anomaly_detection"
+  target      String?  // target column
+  features    Json?    // selected features
+  results     Json?    @db.JsonB // ML results, SHAP values, metrics
+  status      String   @default("pending") // "pending", "running", "completed", "failed"
+  datasetId   String
+  dataset     Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [clerkId])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([datasetId])
+}
