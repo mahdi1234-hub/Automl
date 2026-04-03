@@ -41,8 +41,112 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  const handleUrlUpload = async (url: string) => {
+    setIsUploading(true);
+    const uploadMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: "user",
+      content: `📊 Loading dataset from URL: ${url}`,
+      createdAt: new Date(),
+    };
+    setMessages((prev) => [...prev, uploadMsg]);
+
+    try {
+      const res = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      const data = await res.json();
+      if (data.dataset) {
+        setActiveDataset(data.dataset);
+        const cols = data.dataset.columns;
+        const numericCols = cols.filter((c: { type: string }) => c.type === "numeric");
+        const categoricalCols = cols.filter((c: { type: string }) => c.type === "categorical");
+        const datetimeCols = cols.filter((c: { type: string }) => c.type === "datetime");
+
+        let suggestions = "";
+        if (datetimeCols.length > 0 && numericCols.length > 0) {
+          suggestions += "\n- **Time Series Forecasting**: Detected datetime columns - I can forecast future values\n";
+        }
+        if (categoricalCols.length > 0 && numericCols.length > 0) {
+          suggestions += "- **Classification**: Predict categorical outcomes based on features\n";
+        }
+        if (numericCols.length >= 2) {
+          suggestions += "- **Regression**: Predict numerical values\n";
+          suggestions += "- **Clustering**: Discover natural groupings in your data\n";
+        }
+        suggestions += "- **Anomaly Detection**: Find unusual patterns\n";
+
+        const analysisMsg: ChatMessage = {
+          id: `msg-${Date.now() + 1}`,
+          role: "assistant",
+          content: `## Dataset Loaded Successfully! 🎉
+
+**${data.dataset.name}** - ${data.dataset.rowCount.toLocaleString()} rows x ${cols.length} columns
+
+### Column Analysis
+| Column | Type | Unique Values | Missing |
+|--------|------|---------------|---------|
+${cols.map((c: { name: string; type: string; uniqueCount: number; nullCount: number }) => `| ${c.name} | \`${c.type}\` | ${c.uniqueCount} | ${c.nullCount} |`).join("\n")}
+
+### Recommended Analyses
+${suggestions}
+
+**What would you like to do with this data?** I can:
+1. Run a complete **AutoML analysis** with model comparison
+2. Generate **exploratory visualizations**
+3. Perform **feature importance** analysis
+4. Create **correlation** and **relationship** graphs
+5. Run **predictions** or **forecasting**
+
+Just tell me what you'd like, or I'll suggest the best approach!`,
+          createdAt: new Date(),
+        };
+        setMessages((prev) => [...prev, analysisMsg]);
+
+        // Store context
+        await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: `Dataset loaded from URL with ${data.dataset.rowCount} rows. Columns: ${cols.map((c: { name: string; type: string }) => `${c.name} (${c.type})`).join(", ")}`,
+            conversationId,
+            datasetId: data.dataset.id,
+          }),
+        }).then((r) => r.json()).then((d) => {
+          if (d.conversationId) setConversationId(d.conversationId);
+        }).catch(() => {});
+      } else {
+        throw new Error(data.error || "Failed to load CSV");
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: "assistant",
+          content: "Failed to load the CSV from that URL. Please check the URL and try again.",
+          createdAt: new Date(),
+        },
+      ]);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+
+    // Detect if the message contains a CSV URL
+    const urlMatch = input.trim().match(/https?:\/\/[^\s]+\.(csv|CSV)(\?[^\s]*)?|https?:\/\/api\.csvgetter\.com\/[^\s]+/i);
+    if (urlMatch) {
+      const url = urlMatch[0];
+      setInput("");
+      await handleUrlUpload(url);
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -450,9 +554,9 @@ function EmptyState({
     },
     {
       icon: Sparkles,
-      title: "Anomaly Detection",
-      text: "Help me find anomalies and outliers in my dataset. What methods do you recommend?",
-      description: "Find unusual patterns in data",
+      title: "Load Test Dataset",
+      text: "https://api.csvgetter.com/eQpQkaTDwkpqdQMbojaM",
+      description: "Load a solar energy weather dataset from URL",
     },
   ];
 
