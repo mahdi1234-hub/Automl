@@ -96,7 +96,8 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Store dataset in DB
+    // Store dataset in DB (limit data to 500 rows to avoid size limits)
+    const storedData = data.length > 500 ? data.slice(0, 500) : data;
     let dataset;
     try {
       dataset = await prisma.dataset.create({
@@ -108,12 +109,12 @@ export async function POST(req: NextRequest) {
           rowCount: data.length,
           fileSize: text.length,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data: data as any,
+          data: storedData as any,
           userId,
         },
       });
     } catch (e) {
-      console.error("DB error:", e);
+      console.error("DB error storing dataset:", e);
       // Return dataset info without DB storage
       return NextResponse.json({
         dataset: {
@@ -150,8 +151,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Upload URL error:", error);
+    const msg = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to load CSV from URL" },
+      { error: `Failed to load CSV from URL: ${msg}` },
       { status: 500 }
     );
   }

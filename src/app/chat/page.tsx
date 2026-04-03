@@ -121,13 +121,14 @@ Just tell me what you'd like, or I'll suggest the best approach!`,
       } else {
         throw new Error(data.error || "Failed to load CSV");
       }
-    } catch {
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "assistant",
-          content: "Failed to load the CSV from that URL. Please check the URL and try again.",
+          content: `Failed to load the CSV from that URL: ${errorMsg}. Please check the URL and try again, or upload the file directly.`,
           createdAt: new Date(),
         },
       ]);
@@ -440,6 +441,7 @@ Just tell me what you'd like, or I'll suggest the best approach!`,
                     setInput(text);
                     textareaRef.current?.focus();
                   }}
+                  onUrlLoad={handleUrlUpload}
                 />
               ) : (
                 messages.map((msg) => (
@@ -529,9 +531,11 @@ Just tell me what you'd like, or I'll suggest the best approach!`,
 function EmptyState({
   onUploadClick,
   onSuggestionClick,
+  onUrlLoad,
 }: {
   onUploadClick: () => void;
   onSuggestionClick: (text: string) => void;
+  onUrlLoad?: (url: string) => void;
 }) {
   const suggestions = [
     {
@@ -555,8 +559,9 @@ function EmptyState({
     {
       icon: Sparkles,
       title: "Load Test Dataset",
-      text: "https://api.csvgetter.com/eQpQkaTDwkpqdQMbojaM",
+      text: "",
       description: "Load a solar energy weather dataset from URL",
+      action: () => onUrlLoad?.("https://api.csvgetter.com/eQpQkaTDwkpqdQMbojaM"),
     },
   ];
 
