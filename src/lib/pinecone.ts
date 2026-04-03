@@ -18,7 +18,7 @@ function getIndex() {
 async function generateEmbedding(text: string): Promise<number[]> {
   // Use a simple but effective text-to-vector approach
   // In production, you'd use an embedding model
-  const dimension = 1536;
+  const dimension = 384;
   const vector = new Array(dimension).fill(0);
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
