@@ -52,10 +52,20 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, uploadMsg]);
 
     try {
-      const res = await fetch("/api/upload-url", {
+      // Download CSV client-side to avoid server-side timeout
+      const csvResponse = await fetch(url);
+      if (!csvResponse.ok) throw new Error(`Failed to fetch CSV: ${csvResponse.status}`);
+      const csvText = await csvResponse.text();
+      const fileName = url.split("/").pop() || "remote-dataset.csv";
+      const file = new File([csvText], fileName.endsWith(".csv") ? fileName : `${fileName}.csv`, { type: "text/csv" });
+      
+      // Upload via regular file upload API
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: formData,
       });
 
       const data = await res.json();

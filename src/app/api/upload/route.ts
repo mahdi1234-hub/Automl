@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Store dataset in DB
+    // Store dataset in DB (limit to 500 rows to avoid DB size limits)
+    const storedData = data.length > 500 ? data.slice(0, 500) : data;
     const dataset = await prisma.dataset.create({
       data: {
         name: file.name.replace(/\.csv$/i, ""),
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
         rowCount: data.length,
         fileSize: file.size,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: data as any,
+        data: storedData as any,
         userId,
       },
     });
